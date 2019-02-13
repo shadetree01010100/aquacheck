@@ -1,4 +1,4 @@
-from nio.block.base import Block
+from nio import Block
 from nio.properties import VersionProperty
 
 
