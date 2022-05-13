@@ -116,7 +116,7 @@ class Aquacheck(GeneratorBlock):
                 port_name))
             self._set_probe_state(name, None)
             return
-        port.write('0I!\r\n'.encode('utf-8'))
+        port.write('0I!\r\n'.encode())
         probe_id = port.readline()
         probe_id = probe_id.decode().rstrip()
         try:
@@ -143,7 +143,7 @@ class Aquacheck(GeneratorBlock):
 
     def _read(self, name, port):
         # moisture sensors
-        port.write('0M0!\r\n'.encode('utf-8'))
+        port.write('0M0!\r\n'.encode())
         response = port.readline()
         response = response.decode().rstrip()
         delay = int(response[0:3])
@@ -167,7 +167,7 @@ class Aquacheck(GeneratorBlock):
         moisture_values = list()
         moisture_error = False
         for r in range(num_sensors):
-            port.write('0D{}!\r\n'.format(r).encode('utf-8'))
+            port.write('0D{}!\r\n'.format(r).encode())
             response = port.readline()
             response = response.decode().rstrip()
             if not response:
@@ -200,7 +200,7 @@ class Aquacheck(GeneratorBlock):
                     '[{}] Failed to read all moisture sensors'.format(name))
                 moisture_error = True
         # temperature sensors
-        port.write('0M1!\r\n'.encode('utf-8'))
+        port.write('0M1!\r\n'.encode())
         response = port.readline()
         response = response.decode().rstrip()
         delay = int(response[0:3])  # should be 0, no attention response
@@ -208,7 +208,7 @@ class Aquacheck(GeneratorBlock):
         temperature_values = list()
         temp_error = False
         for r in range(num_sensors):
-            port.write('OD{}!\r\n'.format(r).encode('utf-8'))
+            port.write('OD{}!\r\n'.format(r).encode())
             response = port.readline()
             response = response.decode().rstrip()
             if not response:
