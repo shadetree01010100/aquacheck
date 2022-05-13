@@ -239,7 +239,7 @@ class Aquacheck(GeneratorBlock):
             if not temp_error:
                 self.logger.error(
                     '[{}] Failed to read all temperature sensors'.format(name))
-                error = True
+                temp_error = True
         if moisture_error or temp_error:
             self._set_probe_state(name, False)
             return
