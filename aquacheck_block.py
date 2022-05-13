@@ -198,7 +198,9 @@ class Aquacheck(GeneratorBlock):
         except AssertionError:
             if not moisture_error:
                 self.logger.error(
-                    '[{}] Failed to read all moisture sensors'.format(name))
+                    '[{}] Failed to read {} moisture sensors'.format(
+                        name,
+                        num_sensors - len(moisture_values)))
                 moisture_error = True
         # temperature sensors
         port.write('0M1!\r\n'.encode())
@@ -241,7 +243,9 @@ class Aquacheck(GeneratorBlock):
         except AssertionError:
             if not temp_error:
                 self.logger.error(
-                    '[{}] Failed to read all temperature sensors'.format(name))
+                    '[{}] Failed to read {} temperature sensors'.format(
+                        name,
+                        num_sensors - len(temperature_values)))
                 temp_error = True
         self._readings[name] = {
                 'moisture_values': moisture_values,
