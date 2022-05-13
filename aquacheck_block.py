@@ -248,8 +248,13 @@ class Aquacheck(GeneratorBlock):
         self._set_probe_state(name, True)
 
     def _set_probe_state(self, name, state):
-        previous_state = self._probe_states.get(name)
-        if state != previous_state:
+        try:
+            previous_state = self._probe_states['name']
+            state_change = state != previous_state
+        except KeyError:
+            # this is the initial state
+            state_change = True
+        if state_change:
             self._probe_states[name] = state
             if state:
                 self.logger.info('[{}] Ready'.format(name))
