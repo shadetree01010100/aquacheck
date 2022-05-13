@@ -136,5 +136,5 @@ class TestAquacheck(NIOBlockTestCase):
         ])
 
         block.stop()
-        for name, port in block.probes.items():
+        for name, port in block.ports.items():
             self.assertEqual(port.close.call_count, 1)

@@ -48,7 +48,8 @@ class Aquacheck(GeneratorBlock):
 
     def __init__(self):
         super().__init__()
-        self.probes = dict()  # {name: port} mapping of configured probes
+        self.ports = dict()  # {name: port} mapping of configured probes
+        self.port_names = dict() #  {name: port_name} mapping of port strings
         self._active = False  # ignore read command while busy
         self._probe_states = dict()  # True: working normally
                                     # False: Port open, bad data
@@ -60,6 +61,7 @@ class Aquacheck(GeneratorBlock):
         super().configure(context)
         connection_threads = list()
         for probe in self.configured_probes():
+            self.port_names[probe.name()] = probe.port()
             thread = spawn(self._open_port, probe.name(), probe.port())
             connection_threads.append(thread)
         for thread in connection_threads:
@@ -98,7 +100,7 @@ class Aquacheck(GeneratorBlock):
         for job in self._reader_jobs:
             job.cancel()
         # close ports
-        for name, port in self.probes.items():
+        for name, port in self.ports.items():
             port.close()
             self.logger.debug('[{}] Closed port {}'.format(name, port.name))
         super().stop()
@@ -136,7 +138,7 @@ class Aquacheck(GeneratorBlock):
                 port_name,
                 probe_serial_number,
                 probe_version))
-        self.probes[name] = port
+        self.ports[name] = port
         self._set_probe_state(name, True)
 
     def _read(self, name, port):
@@ -266,32 +268,28 @@ class Aquacheck(GeneratorBlock):
     def _read_and_notify(self):
         self._active = True
         self._readings = dict()  # clear internal buffer
-        try:
-            self._spawn_readers()
-            signal_list = list()
-            for name, reading in self._readings.items():
-                signal = Signal({
-                    'name': name,
-                    'moisture_values': reading['moisture_values'],
-                    'temperature_values': reading['temperature_values'],
-                })
-                signal_list.append(signal)
-            self.notify_signals(signal_list)
-        except:
-            # catch ang log so active flag can be reset
-            self.logger.error('Unexpected Error!')
+        self._spawn_readers()
+        signal_list = list()
+        for name, reading in self._readings.items():
+            signal = Signal({
+                'name': name,
+                'moisture_values': reading['moisture_values'],
+                'temperature_values': reading['temperature_values'],
+            })
+            signal_list.append(signal)
+        self.notify_signals(signal_list)
         self._active = False
 
     def _spawn_readers(self):
         open_threads = list()
         for name, state in self._probe_states.items():
             if state is None:
-                thread = spawn(self._open_port, name, self.probes[name].name)
+                thread = spawn(self._open_port, name, self.port_names[name])
                 open_threads.append(thread)
         for thread in open_threads:
             thread.join()
         reader_threads = list()
-        for name, port in self.probes.items():
+        for name, port in self.ports.items():
             thread = spawn(self._read, name, port)
             reader_threads.append(thread)
         for thread in reader_threads:
