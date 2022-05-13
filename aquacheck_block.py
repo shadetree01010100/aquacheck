@@ -205,6 +205,8 @@ class Aquacheck(GeneratorBlock):
         response = response.decode().rstrip()
         delay = int(response[0:3])  # should be 0, no attention response
         num_sensors = int(response[-1])
+        self.logger.debug(
+            '[{}] Reading {} temperature sensors'.format(name, num_sensors))
         temperature_values = list()
         temp_error = False
         for r in range(num_sensors):
