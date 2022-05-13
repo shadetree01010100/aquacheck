@@ -266,11 +266,11 @@ class Aquacheck(GeneratorBlock):
         if state_change:
             self._probe_states[name] = state
             if state:
-                self.logger.info('[{}] Ready'.format(name))
+                self.logger.info('[{}] Status: Ready'.format(name))
             elif state is None:
-                self.logger.warning('[{}] Interface Error'.format(name))
+                self.logger.warning('[{}] Status: Interface Error'.format(name))
             else:
-                self.logger.warning('[{}] Protocol Error'.format(name))
+                self.logger.warning('[{}] Status: Protocol Error'.format(name))
 
     def _read_and_notify(self):
         self._active = True
