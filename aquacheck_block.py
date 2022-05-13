@@ -150,9 +150,8 @@ class Aquacheck(GeneratorBlock):
         num_sensors = int(response[-1])
         if delay:
             self.logger.debug(
-                '[{}] {} sensors will be ready in {} seconds...'.format(
+                '[{}] Sensors will be ready in {} seconds...'.format(
                     name,
-                    num_sensors,
                     delay))
             time_waited = 0
             while time_waited < delay:
@@ -164,6 +163,8 @@ class Aquacheck(GeneratorBlock):
                 self.logger.warning(
                     '[{}] No \"attention response\", continuing...'.format(
                         name))
+        self.logger.debug(
+            '[{}] Reading {} moisture sensors'.format(name, num_sensors))
         moisture_values = list()
         moisture_error = False
         for r in range(num_sensors):
