@@ -13,7 +13,7 @@ import serial
 
 class ConfiguredProbe(PropertyHolder):
 
-    name = StringProperty(title='Name', default='Zone 1', order=0)
+    name = StringProperty(title='Name', default='Zone X', order=0)
     port = StringProperty(title='Serial Port', default='/dev/ttyXX', order=1)
 
 
@@ -36,7 +36,7 @@ class Aquacheck(GeneratorBlock):
         default=[
             {
                 'port': '/dev/ttyXX',
-                'name': 'Zone 1',
+                'name': 'Zone ',
             }
         ],
         order=0)
