@@ -27,7 +27,7 @@ class Aquacheck(GeneratorBlock):
         'bytesize': 7,
         'parity': 'E',
         'stopbits': 1,
-        'timeout': 0.5,
+        'timeout': 1,
     }
 
     configured_probes = ListProperty(
