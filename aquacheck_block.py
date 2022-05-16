@@ -223,7 +223,7 @@ class Aquacheck(GeneratorBlock):
         temperature_values = list()
         temp_error = False
         for r in range(num_sensors):
-            command = 'OD{}!\r\n'.format(r).encode()
+            command = '0D{}!\r\n'.format(r).encode()
             port.write(command)
             self.logger.debug('--> {}'.format(command))
             response = port.readline()
