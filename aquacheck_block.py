@@ -1,5 +1,6 @@
 import datetime
 import re
+import time
 
 from nio import GeneratorBlock, Signal
 from nio.command import command
@@ -116,16 +117,19 @@ class Aquacheck(GeneratorBlock):
                 port_name))
             self._set_probe_state(name, None)
             return
-        port.write('0I!\r\n'.encode())
-        probe_id = port.readline()
-        probe_id = probe_id.decode().rstrip()
+        command = '0I!\r\n'.encode()
+        port.write(command)
+        self.logger.debug('--> {}'.format(command))
+        response = port.readline()
+        self.logger.debug('<-- {}'.format(response))
+        response = response.decode().rstrip()
         try:
-            probe_model_info = probe_id.split('AquaChck')[-1]
+            probe_model_info = response.split('AquaChck')[-1]
         except:
-            if probe_id:
+            if response:
                 self.logger.error('[{}] Invalid response: \"{}\"'.format(
                     name,
-                    probe_id))
+                    response))
             else:
                 self.logger.error('[{}] No response from probe'.format(name))
             self._set_probe_state(probe.name(), False)
@@ -143,8 +147,11 @@ class Aquacheck(GeneratorBlock):
 
     def _read(self, name, port):
         # moisture sensors
-        port.write('0M0!\r\n'.encode())
+        command = '0M0!\r\n'.encode()
+        port.write(command)
+        self.logger.debug('--> {}'.format(command))
         response = port.readline()
+        self.logger.debug('<-- {}'.format(response))
         response = response.decode().rstrip()
         delay = int(response[0:3])
         num_sensors = int(response[-1])
@@ -153,13 +160,10 @@ class Aquacheck(GeneratorBlock):
                 '[{}] Sensors will be ready in {} seconds...'.format(
                     name,
                     delay))
-            time_waited = 0
-            while time_waited < delay:
-                attention_response = port.readline()
-                if attention_response:
-                    break
-                time_waited += self.COM_PARAMS['timeout']
-            else:
+            time.sleep(delay)  # this should be a Job so it can be cancelled
+            attention_response = port.readline()
+            self.logger.debug('<-- {}'.format(attention_response))
+            if not attention_response:
                 self.logger.warning(
                     '[{}] No \"attention response\", continuing...'.format(
                         name))
@@ -168,8 +172,11 @@ class Aquacheck(GeneratorBlock):
         moisture_values = list()
         moisture_error = False
         for r in range(num_sensors):
-            port.write('0D{}!\r\n'.format(r).encode())
+            command = '0D{}!\r\n'.format(r).encode()
+            port.write(command)
+            self.logger.debug('--> {}'.format(command))
             response = port.readline()
+            self.logger.debug('<-- {}'.format(response))
             response = response.decode().rstrip()
             if not response:
                 break
@@ -203,8 +210,11 @@ class Aquacheck(GeneratorBlock):
                         num_sensors - len(moisture_values)))
                 moisture_error = True
         # temperature sensors
-        port.write('0M1!\r\n'.encode())
+        command = '0M1!\r\n'.encode()
+        port.write(command)
+        self.logger.debug('--> {}'.format(command))
         response = port.readline()
+        self.logger.debug('<-- {}'.format(response))
         response = response.decode().rstrip()
         delay = int(response[0:3])  # should be 0, no attention response
         num_sensors = int(response[-1])
@@ -213,8 +223,11 @@ class Aquacheck(GeneratorBlock):
         temperature_values = list()
         temp_error = False
         for r in range(num_sensors):
-            port.write('OD{}!\r\n'.format(r).encode())
+            command = 'OD{}!\r\n'.format(r).encode()
+            port.write(command)
+            self.logger.debug('--> {}'.format(command))
             response = port.readline()
+            self.logger.debug('<-- {}'.format(response))
             response = response.decode().rstrip()
             if not response:
                 break

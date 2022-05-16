@@ -49,14 +49,12 @@ with serial.Serial(**params) as port:
     response = response.decode().rstrip()
     delay = int(response[0:3])
     num_sensors = int(response[-1])
-    if delay:
-        print('WAIT: {} sensors will be ready in {} seconds...'.format(
-            num_sensors, delay))
-    attention_response = False
-    timeout_cycles = 0
     # if there is a delay indicated, the probe will send \r\n as "attention response"
     # after approx. <delay> seconds to signal that data is ready
     if delay:
+        attention_response = False
+        print('WAIT: {} sensors will be ready in {} seconds...'.format(
+            num_sensors, delay))
         time.sleep(delay)
         attention_response = port.readline()
         print('\t{} <-- {}'.format(
