@@ -66,7 +66,13 @@ class Aquacheck(GeneratorBlock):
             thread = spawn(self._open_port, probe.name(), probe.port())
             connection_threads.append(thread)
         for thread in connection_threads:
-            thread.join()  # let's hope this returns quickly lmao
+            try:
+                thread.join()
+            except Exception as e:
+                # log errors from worker threads
+                self.logger.warning('worker thread raised {}: {}'.format(
+                    e.__class__.__name__,
+                    e.message))
 
     def current_state(self):
         current_state = dict()
@@ -309,10 +315,22 @@ class Aquacheck(GeneratorBlock):
                 thread = spawn(self._open_port, name, self.port_names[name])
                 open_threads.append(thread)
         for thread in open_threads:
-            thread.join()
+            try:
+                thread.join()
+            except Exception as e:
+                # log errors from worker threads
+                self.logger.warning('worker thread raised {}: {}'.format(
+                    e.__class__.__name__,
+                    e.message))
         reader_threads = list()
         for name, port in self.ports.items():
             thread = spawn(self._read, name, port)
             reader_threads.append(thread)
         for thread in reader_threads:
-            thread.join()
+            try:
+                thread.join()
+            except Exception as e:
+                # log errors from worker threads
+                self.logger.warning('worker thread raised {}: {}'.format(
+                    e.__class__.__name__,
+                    e.message))
