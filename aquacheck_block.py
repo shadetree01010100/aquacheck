@@ -112,6 +112,8 @@ class Aquacheck(GeneratorBlock):
         try:
             port = serial.Serial(**params)
         except:
+            if self._probe_states['name'] is None:
+                return
             self.logger.error('[{}] Failed to open serial port {}'.format(
                 name,
                 port_name))
