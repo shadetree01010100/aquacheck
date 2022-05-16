@@ -132,7 +132,7 @@ class Aquacheck(GeneratorBlock):
                     response))
             else:
                 self.logger.error('[{}] No response from probe'.format(name))
-            self._set_probe_state(probe.name(), False)
+            self._set_probe_state(name, False)
             return
         probe_version = probe_model_info[6:9]
         probe_serial_number = probe_model_info[10:]
