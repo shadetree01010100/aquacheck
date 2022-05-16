@@ -27,7 +27,7 @@ class Aquacheck(GeneratorBlock):
         'bytesize': 7,
         'parity': 'E',
         'stopbits': 1,
-        'timeout': 1,
+        'timeout': 0.5,
     }
 
     configured_probes = ListProperty(
@@ -158,7 +158,7 @@ class Aquacheck(GeneratorBlock):
                 attention_response = port.readline()
                 if attention_response:
                     break
-                time_waited += 1
+                time_waited += self.COM_PARAMS['timeout']
             else:
                 self.logger.warning(
                     '[{}] No \"attention response\", continuing...'.format(
