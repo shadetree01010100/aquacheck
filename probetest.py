@@ -1,5 +1,6 @@
 import re
 import sys
+import time
 
 import serial
 
@@ -10,56 +11,76 @@ params = {
     'bytesize': 7,
     'parity': 'E',
     'stopbits': 1,
-    'timeout': 0.5,
+    'timeout': 1.0,
 }
-probe_address = 0
 
+def elapsed(start_time):
+    return '{:.3f}'.format(time.monotonic() - start_time)
+
+
+start_time = time.monotonic()
 print('opening port...')
 with serial.Serial(**params) as port:
-    print(f'finding probe at address {probe_address}...')
-    command = f'{probe_address}I!'
-    port.write(f'{command}\r\n'.encode())
-    probe_id = port.readline()
-    probe_id = probe_id.decode().rstrip()
+    print('finding probe...')
+    command = '0I!\r\n'.encode()
+    print('\t{} --> {}'.format(elapsed(start_time), command))
+    port.write(command)
+    response = port.readline()
+    print('\t{} <-- {}'.format(elapsed(start_time), response))
+    response = response.decode().rstrip()
     try:
-        _, probe_model_info = probe_id.split('AquaChck', 1)
+        _, probe_model_info = response.split('AquaChck', 1)
     except:
-        if probe_id:
-            sys.exit(f'ERROR: Invalid response from probe: \"{probe_id}\"')
+        if response:
+            sys.exit('ERROR: Invalid response from probe: \"{}\"'.format(response))
         sys.exit('ERROR: No response from probe')
     probe_model = probe_model_info[:6]
     probe_version = probe_model_info[6:9]
     probe_serial_number = probe_model_info[9:]
-    print(f'Aquacheck {probe_model} S/N {probe_serial_number} ver. {probe_version}')
+    print('Aquacheck {} S/N {} ver. {}'.format(
+        probe_model, probe_serial_number, probe_version))
 
     print('starting moisture measurement...')
-    command = f'{probe_address}M0!'
-    port.write(f'{command}\r\n'.encode())
+    command = '0M0!\r\n'.encode()
+    print('\t{} --> {}'.format(elapsed(start_time), command))
+    port.write(command)
     response = port.readline()
+    print('\t{} <-- {}'.format(elapsed(start_time), response))
     response = response.decode().rstrip()
     delay = int(response[0:3])
     num_sensors = int(response[-1])
     if delay:
-        print(f'WAIT: {num_sensors} sensors will be ready in {delay} seconds...')
+        print('WAIT: {} sensors will be ready in {} seconds...'.format(
+            num_sensors, delay))
     attention_response = False
     timeout_cycles = 0
     # if there is a delay indicated, the probe will send \r\n as "attention response"
     # after approx. <delay> seconds to signal that data is ready
     if delay:
-        while not attention_response:
-            if timeout_cycles * params['timeout'] >= delay:
-                break
-            attention_response = port.readline()
-            timeout_cycles += 1
+        time.sleep(delay)
+        attention_response = port.readline()
+        print('\t{} <-- {}'.format(
+            elapsed(start_time), attention_response), flush=True)
+        # while not attention_response:
+        #     if timeout_cycles * params['timeout'] >= delay:
+        #         break
+        #     attention_response = port.readline()
+        #     if attention_response:
+        #         print('\t{} <-- {}'.format(
+        #             elapsed(start_time), attention_response), flush=True)
+        #     timeout_cycles += 1
         if not attention_response:
             print('ERROR: no \"attention response\" from probe, continuing...')
     print('reading moisture data...')
     moisture_values = list()
     error = False
     for r in range(num_sensors):
-        command = f'{probe_address}D{r}!'
-        port.write(f'{command}\r\n'.encode())
+        command = '0D{}!\r\n'.format(r).encode()
+        print('\t{} --> {}'.format(
+            elapsed(start_time), command), flush=True)
+        port.write(command)
         response = port.readline()
+        print('\t{} <-- {}'.format(elapsed(start_time), response), flush=True)
         response = response.decode().rstrip()
         if not response:
             break
@@ -73,33 +94,39 @@ with serial.Serial(**params) as port:
             except ValueError:
                 if not value.isprintable():
                     value = value.encode()
-                print(f'ERROR: got bad value {value}', flush=True)
+                print('ERROR: got bad value {}'.format(value), flush=True)
                 error = True
                 continue
             except AssertionError:
-                print(f'ERROR: out of range value \"{moisture_value}\"', flush=True)
+                print('ERROR: out of range value \"{}\"'.format(moisture_value), flush=True)
                 error = True
                 continue
             moisture_values.append(moisture_value)
     try:
         assert len(moisture_values) == num_sensors
     except AssertionError:
-        print(f'ERROR: failed to read {num_sensors - len(moisture_values)} moisture sensors')
+        print('ERROR: failed to read {} moisture sensors'.format(
+            num_sensors - len(moisture_values)))
         error = True
 
     print('starting temperature measurement...')
-    command = f'{probe_address}M1!'
-    port.write(f'{command}\r\n'.encode())
-    response = port.readline().decode().rstrip()
+    command = '0M1!\r\n'.encode()
+    print('\t{} --> {}'.format(elapsed(start_time), command))
+    port.write(command)
+    response = port.readline()
+    print('\t{} <-- {}'.format(elapsed(start_time), response))
+    response = response.decode().rstrip()
     delay = int(response[0:3])  # should be 0, and no attention response when ready
     num_sensors = int(response[-1])
     print('reading temperature data...')
     temperature_values = list()
     error = False
     for r in range(num_sensors):
-        command = f'{probe_address}D{r}!'
-        port.write(f'{command}\r\n'.encode())
+        command = '0D{}!\r\n'.format(r).encode()
+        print('\t{} --> {}'.format(elapsed(start_time), command))
+        port.write(command)
         response = port.readline()
+        print('\t{} <-- {}'.format(elapsed(start_time), response))
         response = response.decode().rstrip()
         if not response:
             break
@@ -113,23 +140,23 @@ with serial.Serial(**params) as port:
             except ValueError:
                 if not value.isprintable():
                     value = value.encode()
-                print(f'ERROR: got bad value {value}', flush=True)
+                print('ERROR: got bad value {}'.format(value), flush=True)
                 error = True
                 continue
             except AssertionError:
-                print(f'ERROR: out of range value \"{temperature_value}\"', flush=True)
+                print('ERROR: out of range value \"{}\"'.format(temperature_value), flush=True)
                 error = True
                 continue
             temperature_values.append(temperature_value)
     try:
         assert len(temperature_values) == num_sensors
     except AssertionError:
-        print(f'ERROR: failed to read {num_sensors - len(temperature_values)} temperature sensors')
+        print('ERROR: failed to read {} temperature sensors'.format(num_sensors - len(temperature_values)))
         error = True
 
     # done
-    print('cleaning up...')
-    port.reset_input_buffer()
+    # print('cleaning up...')
+    # port.reset_input_buffer()
 if error:
     print('ERROR: failed to read all values, please retry.')
 print('SOIL MOISTURE: ', moisture_values)
