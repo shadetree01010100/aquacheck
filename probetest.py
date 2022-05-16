@@ -59,14 +59,6 @@ with serial.Serial(**params) as port:
         attention_response = port.readline()
         print('\t{} <-- {}'.format(
             elapsed(start_time), attention_response), flush=True)
-        # while not attention_response:
-        #     if timeout_cycles * params['timeout'] >= delay:
-        #         break
-        #     attention_response = port.readline()
-        #     if attention_response:
-        #         print('\t{} <-- {}'.format(
-        #             elapsed(start_time), attention_response), flush=True)
-        #     timeout_cycles += 1
         if not attention_response:
             print('ERROR: no \"attention response\" from probe, continuing...')
     print('reading moisture data...')
@@ -152,9 +144,6 @@ with serial.Serial(**params) as port:
         print('ERROR: failed to read {} temperature sensors'.format(num_sensors - len(temperature_values)))
         error = True
 
-    # done
-    # print('cleaning up...')
-    # port.reset_input_buffer()
 if error:
     print('ERROR: failed to read all values, please retry.')
 print('SOIL MOISTURE: ', moisture_values)

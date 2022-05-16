@@ -37,7 +37,7 @@ class Aquacheck(GeneratorBlock):
         default=[
             {
                 'port': '/dev/ttyXX',
-                'name': 'Zone ',
+                'name': 'Zone X',
             }
         ],
         order=0)
