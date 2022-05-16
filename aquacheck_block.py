@@ -71,8 +71,7 @@ class Aquacheck(GeneratorBlock):
             except Exception as e:
                 # log errors from worker threads
                 self.logger.warning('worker thread raised {}: {}'.format(
-                    e.__class__.__name__,
-                    e.message))
+                    e.__class__.__name__))
 
     def current_state(self):
         current_state = dict()
@@ -320,8 +319,7 @@ class Aquacheck(GeneratorBlock):
             except Exception as e:
                 # log errors from worker threads
                 self.logger.warning('worker thread raised {}: {}'.format(
-                    e.__class__.__name__,
-                    e.message))
+                    e.__class__.__name__))
         reader_threads = list()
         for name, port in self.ports.items():
             thread = spawn(self._read, name, port)
@@ -332,5 +330,4 @@ class Aquacheck(GeneratorBlock):
             except Exception as e:
                 # log errors from worker threads
                 self.logger.warning('worker thread raised {}: {}'.format(
-                    e.__class__.__name__,
-                    e.message))
+                    e.__class__.__name__))
