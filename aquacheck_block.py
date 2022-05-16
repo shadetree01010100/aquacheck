@@ -119,9 +119,9 @@ class Aquacheck(GeneratorBlock):
             return
         command = '0I!\r\n'.encode()
         port.write(command)
-        self.logger.debug('--> {}'.format(command))
+        self.logger.debug('[{}] --> {}'.format(name, command))
         response = port.readline()
-        self.logger.debug('<-- {}'.format(response))
+        self.logger.debug('[{}] <-- {}'.format(name, response))
         response = response.decode().rstrip()
         try:
             probe_model_info = response.split('AquaChck')[-1]
@@ -149,9 +149,9 @@ class Aquacheck(GeneratorBlock):
         # moisture sensors
         command = '0M0!\r\n'.encode()
         port.write(command)
-        self.logger.debug('--> {}'.format(command))
+        self.logger.debug('[{}] --> {}'.format(name, command))
         response = port.readline()
-        self.logger.debug('<-- {}'.format(response))
+        self.logger.debug('[{}] <-- {}'.format(name, response))
         response = response.decode().rstrip()
         delay = int(response[0:3])
         num_sensors = int(response[-1])
@@ -162,7 +162,7 @@ class Aquacheck(GeneratorBlock):
                     delay))
             time.sleep(delay)  # this should be a Job so it can be cancelled
             attention_response = port.readline()
-            self.logger.debug('<-- {}'.format(attention_response))
+            self.logger.debug('[{}] <-- {}'.format(name, attention_response))
             if not attention_response:
                 self.logger.warning(
                     '[{}] No \"attention response\", continuing...'.format(
@@ -174,9 +174,9 @@ class Aquacheck(GeneratorBlock):
         for r in range(num_sensors):
             command = '0D{}!\r\n'.format(r).encode()
             port.write(command)
-            self.logger.debug('--> {}'.format(command))
+            self.logger.debug('[{}] --> {}'.format(name, command))
             response = port.readline()
-            self.logger.debug('<-- {}'.format(response))
+            self.logger.debug('[{}] <-- {}'.format(name, response))
             response = response.decode().rstrip()
             if not response:
                 break
@@ -212,9 +212,9 @@ class Aquacheck(GeneratorBlock):
         # temperature sensors
         command = '0M1!\r\n'.encode()
         port.write(command)
-        self.logger.debug('--> {}'.format(command))
+        self.logger.debug('[{}] --> {}'.format(name, command))
         response = port.readline()
-        self.logger.debug('<-- {}'.format(response))
+        self.logger.debug('[{}] <-- {}'.format(name, response))
         response = response.decode().rstrip()
         delay = int(response[0:3])  # should be 0, no attention response
         num_sensors = int(response[-1])
@@ -225,9 +225,9 @@ class Aquacheck(GeneratorBlock):
         for r in range(num_sensors):
             command = '0D{}!\r\n'.format(r).encode()
             port.write(command)
-            self.logger.debug('--> {}'.format(command))
+            self.logger.debug('[{}] --> {}'.format(name, command))
             response = port.readline()
-            self.logger.debug('<-- {}'.format(response))
+            self.logger.debug('[{}] <-- {}'.format(name, response))
             response = response.decode().rstrip()
             if not response:
                 break
