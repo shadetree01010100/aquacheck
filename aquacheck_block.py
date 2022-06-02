@@ -70,7 +70,7 @@ class Aquacheck(GeneratorBlock):
                 thread.join()
             except Exception as e:
                 # log errors from worker threads
-                self.logger.warning('worker thread raised {}: {}'.format(
+                self.logger.warning('worker thread raised {}'.format(
                     e.__class__.__name__))
 
     def current_state(self):
@@ -117,13 +117,15 @@ class Aquacheck(GeneratorBlock):
         try:
             port = serial.Serial(**params)
         except:
-            if self._probe_states['name'] is None:
+            if self._probe_states.get('name', False) is None:
+                # if already set to None, interface error is already logged
                 return
             self.logger.error('[{}] Failed to open serial port {}'.format(
                 name,
                 port_name))
             self._set_probe_state(name, None)
             return
+        # get probe info
         command = '0I!\r\n'.encode()
         port.write(command)
         self.logger.debug('[{}] --> {}'.format(name, command))
@@ -318,7 +320,7 @@ class Aquacheck(GeneratorBlock):
                 thread.join()
             except Exception as e:
                 # log errors from worker threads
-                self.logger.warning('worker thread raised {}: {}'.format(
+                self.logger.warning('worker thread raised {}'.format(
                     e.__class__.__name__))
         reader_threads = list()
         for name, port in self.ports.items():
@@ -329,5 +331,5 @@ class Aquacheck(GeneratorBlock):
                 thread.join()
             except Exception as e:
                 # log errors from worker threads
-                self.logger.warning('worker thread raised {}: {}'.format(
+                self.logger.warning('worker thread raised {}'.format(
                     e.__class__.__name__))
