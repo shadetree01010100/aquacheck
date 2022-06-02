@@ -241,13 +241,14 @@ class Aquacheck(GeneratorBlock):
             # this is the initial state
             state_change = True
         if state_change:
+            self.logger.debug('state changed for \"{}\": {}'.format(name, state))
             self._probe_states[name] = state
             if state:
-                self.logger.info('[{}] Status: Ready'.format(name))
+                self.logger.info('[{}] Ready'.format(name))
             elif state is None:
-                self.logger.warning('[{}] Status: Interface Error'.format(name))
+                self.logger.warning('[{}] Interface Error'.format(name))
             else:
-                self.logger.warning('[{}] Status: Protocol Error'.format(name))
+                self.logger.warning('[{}] Protocol Error'.format(name))
 
     def _read_and_notify(self):
         self.logger.debug('Taking readings from {} probes'.format(len(self.configured_probes())))
@@ -269,14 +270,17 @@ class Aquacheck(GeneratorBlock):
 
     def _spawn_readers(self):
         self.logger.debug('spawning reader threads')
-        reader_threads = list()
+        reader_threads = dict()
         for probe in self.configured_probes():
             thread = spawn(self._read, probe.name(), probe.port())
-            reader_threads.append(thread)
-        for thread in reader_threads:
+            reader_threads[probe.name()] = thread
+        for name, thread in reader_threads.items():
             try:
                 thread.join()
+            except (OSError, IOError) as e:
+                self._set_probe_state(name, None)
+                return
             except Exception as e:
-                # log errors from worker threads
-                self.logger.warning('worker thread raised {}'.format(
-                    e.__class__.__name__))
+                self._set_probe_state(name, False)
+                return
+            self._set_probe_state(name, True)
