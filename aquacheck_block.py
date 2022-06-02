@@ -58,21 +58,6 @@ class Aquacheck(GeneratorBlock):
         self._reader_jobs = list()  # scheduled jobs
         self._readings = dict()  # internal buffer for readings
 
-    def configure(self, context):
-        super().configure(context)
-        connection_threads = list()
-        for probe in self.configured_probes():
-            self.port_names[probe.name()] = probe.port()
-            thread = spawn(self._open_port, probe.name(), probe.port())
-            connection_threads.append(thread)
-        for thread in connection_threads:
-            try:
-                thread.join()
-            except Exception as e:
-                # log errors from worker threads
-                self.logger.warning('worker thread raised {}'.format(
-                    e.__class__.__name__))
-
     def current_state(self):
         current_state = dict()
         for name, state in self._probe_states.items():
@@ -105,178 +90,147 @@ class Aquacheck(GeneratorBlock):
         # cancel jobs
         for job in self._reader_jobs:
             job.cancel()
-        # close ports
-        for name, port in self.ports.items():
-            port.close()
-            self.logger.debug('[{}] Closed port {}'.format(name, port.name))
         super().stop()
 
-    def _open_port(self, name, port_name):
+    def _read(self, name, port_name):
         params = self.COM_PARAMS.copy()
         params['port'] = port_name
-        try:
-            port = serial.Serial(**params)
-        except:
-            if self._probe_states.get('name', False) is None:
-                # if already set to None, interface error is already logged
-                return
-            self.logger.error('[{}] Failed to open serial port {}'.format(
-                name,
-                port_name))
-            self._set_probe_state(name, None)
-            return
-        # get probe info
-        command = '0I!\r\n'.encode()
-        port.write(command)
-        self.logger.debug('[{}] --> {}'.format(name, command))
-        response = port.readline()
-        self.logger.debug('[{}] <-- {}'.format(name, response))
-        response = response.decode().rstrip()
-        try:
-            probe_model_info = response.split('AquaChck')[-1]
-        except:
-            if response:
-                self.logger.error('[{}] Invalid response: \"{}\"'.format(
-                    name,
-                    response))
-            else:
-                self.logger.error('[{}] No response from probe'.format(name))
-            self._set_probe_state(name, False)
-            return
-        probe_version = probe_model_info[6:9]
-        probe_serial_number = probe_model_info[10:]
-        self.logger.debug(
-            '[{}] Ready on {} (S/N {} v.{})'.format(
-                name,
-                port_name,
-                probe_serial_number,
-                probe_version))
-        self.ports[name] = port
-        self._set_probe_state(name, True)
-
-    def _read(self, name, port):
-        # moisture sensors
-        command = '0M0!\r\n'.encode()
-        port.write(command)
-        self.logger.debug('[{}] --> {}'.format(name, command))
-        response = port.readline()
-        self.logger.debug('[{}] <-- {}'.format(name, response))
-        response = response.decode().rstrip()
-        delay = int(response[0:3])
-        num_sensors = int(response[-1])
-        if delay:
+        with serial.Serial(**params) as port:
+            # id probe
+            command = '0I!\r\n'.encode()
+            port.write(command)
+            self.logger.debug('[{}] --> {}'.format(name, command))
+            response = port.readline()
+            self.logger.debug('[{}] <-- {}'.format(name, response))
+            response = response.decode().rstrip()
+            _, probe_model_info = response.split('AquaChck', 1)
+            probe_model = probe_model_info[:6]
+            probe_version = probe_model_info[6:9]
+            probe_serial_number = probe_model_info[9:]
+            self.logger.debug('[{}] Aquacheck {} S/N {} ver. {}'.format(
+                name, probe_model, probe_serial_number, probe_version))
+            # moisture sensors
+            command = '0M0!\r\n'.encode()
+            port.write(command)
+            self.logger.debug('[{}] --> {}'.format(name, command))
+            response = port.readline()
+            self.logger.debug('[{}] <-- {}'.format(name, response))
+            response = response.decode().rstrip()
+            delay = int(response[0:3])
+            num_sensors = int(response[-1])
+            if delay:
+                self.logger.debug(
+                    '[{}] Sensors will be ready in {} seconds...'.format(
+                        name,
+                        delay))
+                time.sleep(delay)  # this should be a Job so it can be cancelled
+                attention_response = port.readline()
+                self.logger.debug('[{}] <-- {}'.format(name, attention_response))
+                if not attention_response:
+                    self.logger.warning(
+                        '[{}] No \"attention response\", continuing...'.format(
+                            name))
             self.logger.debug(
-                '[{}] Sensors will be ready in {} seconds...'.format(
-                    name,
-                    delay))
-            time.sleep(delay)  # this should be a Job so it can be cancelled
-            attention_response = port.readline()
-            self.logger.debug('[{}] <-- {}'.format(name, attention_response))
-            if not attention_response:
-                self.logger.warning(
-                    '[{}] No \"attention response\", continuing...'.format(
-                        name))
-        self.logger.debug(
-            '[{}] Reading {} moisture sensors'.format(name, num_sensors))
-        moisture_values = list()
-        moisture_error = False
-        for r in range(num_sensors):
-            command = '0D{}!\r\n'.format(r).encode()
+                '[{}] Reading {} moisture sensors'.format(name, num_sensors))
+            moisture_values = list()
+            moisture_error = False
+            for r in range(num_sensors):
+                command = '0D{}!\r\n'.format(r).encode()
+                port.write(command)
+                self.logger.debug('[{}] --> {}'.format(name, command))
+                response = port.readline()
+                self.logger.debug('[{}] <-- {}'.format(name, response))
+                response = response.decode().rstrip()
+                if not response:
+                    break
+                values = re.findall('[\+\-][0-9]+\.[0-9]+', response)
+                for value in values:
+                    try:
+                        moisture_value = float(value)
+                        assert -5 < moisture_value < 120
+                    except ValueError:
+                        self.logger.error(
+                            '[{}] Invalid moisture value \"{}\"'.format(
+                                name,
+                                value))
+                        moisture_error = True
+                        continue
+                    except AssertionError:
+                        self.logger.error(
+                            '[{}] Out of range moisture value \"{}\"'.format(
+                                name,
+                                moisture_value))
+                        moisture_error = True
+                        continue
+                    moisture_values.append(moisture_value)
+            try:
+                assert len(moisture_values) == num_sensors
+            except AssertionError:
+                if not moisture_error:
+                    self.logger.error(
+                        '[{}] Failed to read {} moisture sensors'.format(
+                            name,
+                            num_sensors - len(moisture_values)))
+                    moisture_error = True
+            # temperature sensors
+            command = '0M1!\r\n'.encode()
             port.write(command)
             self.logger.debug('[{}] --> {}'.format(name, command))
             response = port.readline()
             self.logger.debug('[{}] <-- {}'.format(name, response))
             response = response.decode().rstrip()
-            if not response:
-                break
-            values = re.findall('[\+\-][0-9]+\.[0-9]+', response)
-            for value in values:
-                try:
-                    moisture_value = float(value)
-                    assert -5 < moisture_value < 120
-                except ValueError:
+            delay = int(response[0:3])  # should be 0, no attention response
+            num_sensors = int(response[-1])
+            self.logger.debug(
+                '[{}] Reading {} temperature sensors'.format(name, num_sensors))
+            temperature_values = list()
+            temp_error = False
+            for r in range(num_sensors):
+                command = '0D{}!\r\n'.format(r).encode()
+                port.write(command)
+                self.logger.debug('[{}] --> {}'.format(name, command))
+                response = port.readline()
+                self.logger.debug('[{}] <-- {}'.format(name, response))
+                response = response.decode().rstrip()
+                if not response:
+                    break
+                values = re.findall('[\+\-][0-9]+\.[0-9]+', response)
+                for value in values:
+                    try:
+                        temperature_value = float(value)
+                        assert -5 < temperature_value < 120
+                    except ValueError:
+                        self.logger.error(
+                            '[{}] Invalid temperature value \"{}\"'.format(
+                                name,
+                                value))
+                        temp_error = True
+                        continue
+                    except AssertionError:
+                        self.logger.error(
+                            '[{}] Out of range temperature value \"{}\"'.format(
+                                name,
+                                temperature_value))
+                        temp_error = True
+                        continue
+                    temperature_values.append(temperature_value)
+            try:
+                assert len(temperature_values) == num_sensors
+            except AssertionError:
+                if not temp_error:
                     self.logger.error(
-                        '[{}] Invalid moisture value \"{}\"'.format(
+                        '[{}] Failed to read {} temperature sensors'.format(
                             name,
-                            value))
-                    moisture_error = True
-                    continue
-                except AssertionError:
-                    self.logger.error(
-                        '[{}] Out of range moisture value \"{}\"'.format(
-                            name,
-                            moisture_value))
-                    moisture_error = True
-                    continue
-                moisture_values.append(moisture_value)
-        try:
-            assert len(moisture_values) == num_sensors
-        except AssertionError:
-            if not moisture_error:
-                self.logger.error(
-                    '[{}] Failed to read {} moisture sensors'.format(
-                        name,
-                        num_sensors - len(moisture_values)))
-                moisture_error = True
-        # temperature sensors
-        command = '0M1!\r\n'.encode()
-        port.write(command)
-        self.logger.debug('[{}] --> {}'.format(name, command))
-        response = port.readline()
-        self.logger.debug('[{}] <-- {}'.format(name, response))
-        response = response.decode().rstrip()
-        delay = int(response[0:3])  # should be 0, no attention response
-        num_sensors = int(response[-1])
-        self.logger.debug(
-            '[{}] Reading {} temperature sensors'.format(name, num_sensors))
-        temperature_values = list()
-        temp_error = False
-        for r in range(num_sensors):
-            command = '0D{}!\r\n'.format(r).encode()
-            port.write(command)
-            self.logger.debug('[{}] --> {}'.format(name, command))
-            response = port.readline()
-            self.logger.debug('[{}] <-- {}'.format(name, response))
-            response = response.decode().rstrip()
-            if not response:
-                break
-            values = re.findall('[\+\-][0-9]+\.[0-9]+', response)
-            for value in values:
-                try:
-                    temperature_value = float(value)
-                    assert -5 < temperature_value < 120
-                except ValueError:
-                    self.logger.error(
-                        '[{}] Invalid temperature value \"{}\"'.format(
-                            name,
-                            value))
+                            num_sensors - len(temperature_values)))
                     temp_error = True
-                    continue
-                except AssertionError:
-                    self.logger.error(
-                        '[{}] Out of range temperature value \"{}\"'.format(
-                            name,
-                            temperature_value))
-                    temp_error = True
-                    continue
-                temperature_values.append(temperature_value)
-        try:
-            assert len(temperature_values) == num_sensors
-        except AssertionError:
-            if not temp_error:
-                self.logger.error(
-                    '[{}] Failed to read {} temperature sensors'.format(
-                        name,
-                        num_sensors - len(temperature_values)))
-                temp_error = True
-        self._readings[name] = {
-                'moisture_values': moisture_values,
-                'temperature_values': temperature_values,
-            }
-        if moisture_error or temp_error:
-            self._set_probe_state(name, False)
-        else:
-            self._set_probe_state(name, True)
+            self._readings[name] = {
+                    'moisture_values': moisture_values,
+                    'temperature_values': temperature_values,
+                }
+            if moisture_error or temp_error:
+                self._set_probe_state(name, False)
+            else:
+                self._set_probe_state(name, True)
 
     def _set_probe_state(self, name, state):
         try:
@@ -310,18 +264,6 @@ class Aquacheck(GeneratorBlock):
         self._active = False
 
     def _spawn_readers(self):
-        open_threads = list()
-        for name, state in self._probe_states.items():
-            if state is None:
-                thread = spawn(self._open_port, name, self.port_names[name])
-                open_threads.append(thread)
-        for thread in open_threads:
-            try:
-                thread.join()
-            except Exception as e:
-                # log errors from worker threads
-                self.logger.warning('worker thread raised {}'.format(
-                    e.__class__.__name__))
         reader_threads = list()
         for name, port in self.ports.items():
             thread = spawn(self._read, name, port)
