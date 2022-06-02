@@ -49,8 +49,6 @@ class Aquacheck(GeneratorBlock):
 
     def __init__(self):
         super().__init__()
-        self.ports = dict()  # {name: port} mapping of configured probes
-        self.port_names = dict() #  {name: port_name} mapping of port strings
         self._active = False  # ignore read command while busy
         self._probe_states = dict()  # True: working normally
                                     # False: Port open, bad data
@@ -80,6 +78,7 @@ class Aquacheck(GeneratorBlock):
     def start(self):
         super().start()
         # schedule a repeatable callback for reads
+        self.logger.debug('Read interval: {}'.format(self.read_interval()))
         delta = datetime.timedelta(seconds=self.read_interval())
         job = Job(self._read_and_notify, delta, True)
         self._reader_jobs.append(job)
@@ -88,6 +87,7 @@ class Aquacheck(GeneratorBlock):
 
     def stop(self):
         # cancel jobs
+        self.logger.debug('Cancelling jobs for {} probes'.format(len(self.configured_probes())))
         for job in self._reader_jobs:
             job.cancel()
         super().stop()
@@ -95,6 +95,7 @@ class Aquacheck(GeneratorBlock):
     def _read(self, name, port_name):
         params = self.COM_PARAMS.copy()
         params['port'] = port_name
+        self.logger.debug('[{}] Opening port \"{}\"'.format(name, port_name))
         with serial.Serial(**params) as port:
             # id probe
             command = '0I!\r\n'.encode()
@@ -249,9 +250,11 @@ class Aquacheck(GeneratorBlock):
                 self.logger.warning('[{}] Status: Protocol Error'.format(name))
 
     def _read_and_notify(self):
+        self.logger.debug('Taking readings from {} probes'.format(len(self.configured_probes())))
         self._active = True
         self._readings = dict()  # clear internal buffer
         self._spawn_readers()
+        self.logger.debug('Preparing results...')
         signal_list = list()
         for name, reading in self._readings.items():
             signal = Signal({
@@ -262,11 +265,13 @@ class Aquacheck(GeneratorBlock):
             signal_list.append(signal)
         self.notify_signals(signal_list)
         self._active = False
+        self.logger.debug('Done reading.')
 
     def _spawn_readers(self):
+        self.logger.debug('spawning reader threads')
         reader_threads = list()
-        for name, port in self.ports.items():
-            thread = spawn(self._read, name, port)
+        for probe in self.configured_probes():
+            thread = spawn(self._read, probe.name(), probe.port())
             reader_threads.append(thread)
         for thread in reader_threads:
             try:
