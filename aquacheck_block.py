@@ -277,10 +277,8 @@ class Aquacheck(GeneratorBlock):
         for name, thread in reader_threads.items():
             try:
                 thread.join()
+                # self._set_probe_state(name, True)
             except (OSError, IOError) as e:
                 self._set_probe_state(name, None)
-                return
             except Exception as e:
                 self._set_probe_state(name, False)
-                return
-            self._set_probe_state(name, True)
